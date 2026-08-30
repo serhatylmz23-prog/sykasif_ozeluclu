@@ -64,7 +64,6 @@ async function recognizeAzureOnce(): Promise<string> {
   });
 }
 
-
 export async function recognizeTurkishOnce(): Promise<string> {
   try {
     return await recognizeAzureOnce();
@@ -161,6 +160,14 @@ function browserVoices(): Promise<SpeechSynthesisVoice[]> {
   });
 }
 
+/**
+ * DÜZELTME: Önceki sürümde bu fonksiyonun içinde "preferred" değişkeni
+ * hiç TANIMLANMADAN kullanılıyordu (derleme sırasında hata vermesi
+ * gerekirdi). Aşağıda hem `preferred` doğru şekilde bulunuyor hem de
+ * hiçbir Türkçe kadın ses bulunamazsa bunu SESSİZCE varsayılan (genelde
+ * erkek) sese düşmek yerine en azından konsola not düşüyoruz — böylece
+ * "neden erkek ses duyuyorum" sorusu kolayca teşhis edilebilir.
+ */
 async function speakWithBrowser(text: string): Promise<void> {
   if (!('speechSynthesis' in window)) {
     throw new Error('Bu tarayıcı ses sentezini desteklemiyor.');
@@ -171,14 +178,19 @@ async function speakWithBrowser(text: string): Promise<void> {
     voice.lang.toLocaleLowerCase('tr-TR').startsWith('tr')
   );
   const preferred = turkishVoices.find((voice) =>
-    /(emel|seda|female|kadın)/i.test(voice.name)
+    /(emel|seda|female|kadın|yelda|filiz)/i.test(voice.name)
   );
+
+  if (!preferred) {
+    console.warn(
+      'Bu cihazda Türkçe bir kadın tarayıcı sesi bulunamadı; sistemin varsayılan Türkçe sesi kullanılacak (cihaza göre erkek ses olabilir). Kalıcı çözüm için Azure Speech yapılandırmasının (.env içindeki AZURE_SPEECH_KEY / AZURE_SPEECH_REGION) doğru olduğundan emin olun; Azure her zaman "tr-TR-EmelNeural" kadın sesini kullanır.'
+    );
+  }
 
   return new Promise((resolve, reject) => {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'tr-TR';
     utterance.voice = preferred || turkishVoices[0] || null;
-    utterance.rate = 1;
     utterance.pitch = 1.03;
     utterance.onend = () => resolve();
     utterance.onerror = () => reject(new Error('Tarayıcı sesi oynatılamadı.'));
